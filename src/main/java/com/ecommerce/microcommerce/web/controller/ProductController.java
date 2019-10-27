@@ -1,7 +1,9 @@
 package com.ecommerce.microcommerce.web.controller;
 
 import java.net.URI;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import javax.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import com.ecommerce.microcommerce.dao.ProductDao;
 import com.ecommerce.microcommerce.model.Product;
+import com.ecommerce.microcommerce.web.exceptions.ProduitGratuitException;
 import com.ecommerce.microcommerce.web.exceptions.ProduitIntrouvableException;
 import com.fasterxml.jackson.databind.ser.FilterProvider;
 import com.fasterxml.jackson.databind.ser.impl.SimpleBeanPropertyFilter;
@@ -43,7 +46,7 @@ public class ProductController {
     SimpleBeanPropertyFilter monFiltre = SimpleBeanPropertyFilter.serializeAllExcept("prixAchat");
 
     FilterProvider listDeNosFiltres =
-        new SimpleFilterProvider().addFilter("monFiltreDynamique", monFiltre);
+        new SimpleFilterProvider().addFilter("PrixAchatExclusionFilter", monFiltre);
 
     MappingJacksonValue produitsFiltres = new MappingJacksonValue(produits);
 
@@ -69,11 +72,14 @@ public class ProductController {
     return produit;
   }
 
-
-
   // ajouter un produit
   @PostMapping(value = "/Produits")
   public ResponseEntity<Void> ajouterProduit(@Valid @RequestBody Product product) {
+
+    if (product.getPrix() == 0) {
+      throw new ProduitGratuitException(
+          String.format("Le produit de nom %s a un prix égal à 0", product.getNom()));
+    }
 
     Product productAdded = productDao.save(product);
 
@@ -97,13 +103,33 @@ public class ProductController {
     productDao.save(product);
   }
 
-
   // Pour les tests
-  @GetMapping(value = "test/produits/{prix}")
+  @GetMapping(value = "test/Produits/{prix}")
   public List<Product> testeDeRequetes(@PathVariable int prix) {
     return productDao.chercherUnProduitCher(400);
   }
 
+  // Exercice - Partie 1
+  @GetMapping(value = "/AdminProduits")
+  public Map<String, Integer> calculerMargeProduit() {
+    Iterable<Product> produits = productDao.findAll();
 
+    HashMap<String, Integer> produitsAvecMarge = new HashMap<>();
 
+    for (Product product : produits) {
+      Integer marge = product.getPrix() - product.getPrixAchat();
+      produitsAvecMarge.put(product.toString(), marge);
+    }
+
+    return produitsAvecMarge;
+  }
+
+  // Exercice - Partie 2
+  @GetMapping(value = "/ProduitsTries")
+  public ResponseEntity<List<Product>> trierProduitsParOrdreAlphabetique() {
+
+    List<Product> produitsTries = productDao.findByOrderByNomAsc();
+
+    return ResponseEntity.ok(produitsTries);
+  }
 }
